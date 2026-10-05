@@ -246,6 +246,26 @@ namespace vamp::binding
             return result;
         }
 
+        // The same spheres as fk(), as one (n_spheres x 4) float array [x, y, z, r]:
+        // no per-sphere Python objects (fk() costs ~0.25 us per sphere in Python).
+        inline static auto fk_array(const Type &c_in)
+            -> Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor>
+        {
+            typename Robot::template Spheres<1> out;
+            Robot::template sphere_fk<1>(Input::template block<1>(c_in), out);
+
+            Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor> result(Robot::n_spheres, 4);
+            for (auto i = 0U; i < Robot::n_spheres; ++i)
+            {
+                result(i, 0) = out.x[{i, 0}];
+                result(i, 1) = out.y[{i, 0}];
+                result(i, 2) = out.z[{i, 0}];
+                result(i, 3) = out.r[{i, 0}];
+            }
+
+            return result;
+        }
+
         inline static auto debug(const Type &c_in, const EnvironmentInput &environment) ->
             typename Robot::Debug
         {
@@ -575,6 +595,11 @@ namespace vamp::binding
         MF("fk",
            fk,
            "Computes the forward kinematics of the robot. Returns array of all collision sphere positions.",
+           "configuration"_a);
+
+        MF("fk_array",
+           fk_array,
+           "fk() as one (n_spheres x 4) float array of [x, y, z, r] rows.",
            "configuration"_a);
 
         MF("eefk",
