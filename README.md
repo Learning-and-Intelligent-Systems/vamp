@@ -9,9 +9,12 @@
 [![arXiv FCIT](https://img.shields.io/badge/arXiv-2411.17902-b31b1b.svg)](https://arxiv.org/abs/2411.17902)
 [![arXiv AORRTC](https://img.shields.io/badge/arXiv-2505.10542-b31b1b.svg)](https://arxiv.org/abs/2505.10542)
 
+[![Interactive Website](https://img.shields.io/badge/Interactive%20Website-8A2BE2)](https://zkingston.com/vamp-web)
+
 ![Demo video](resources/capt_demo.gif)
 
 _For a full demonstration of VAMP running in real-time, see [this video](https://www.youtube.com/watch?v=BzDKdrU1VpM)_.
+_You can also [play with an interactive demonstration here!](https://zkingston.com/vamp-web)_.
 
 This repository hosts the code for:
 - the ICRA 2024 paper [“Motions in Microseconds via Vectorized Sampling-Based Planning”](https://arxiv.org/abs/2309.14545),
@@ -42,7 +45,7 @@ If you use CAPTs or the pointcloud collision checking components of this reposit
   author = {Ramsey, Clayton W. and Kingston, Zachary and Thomason, Wil and Kavraki, Lydia E.},
   title = {Collision-Affording Point Trees: {SIMD}-Amenable Nearest Neighbors for Fast Collision Checking},
   booktitle = {Robotics: Science and Systems},
-  url = {http://arxiv.org/abs/2406.02807},
+  url = {https://www.roboticsproceedings.org/rss20/p038.pdf},
   doi = {10.15607/RSS.2024.XX.038},
   date = {2024}
 }
@@ -100,6 +103,7 @@ VAMP fetches the following external dependencies via [CPM](https://github.com/cp
 - [`nigh`](https://github.com/KavrakiLab/nigh): a fork of the original [`nigh`](https://github.com/UNC-Robotics/nigh) [[4]](#4) to better use our vector types
 - [`pdqsort`](https://github.com/orlp/pdqsort): for fast sorting
 - [`SIMDxorshift`](https://github.com/lemire/SIMDxorshift): alternative fast random numbers for x86 machines
+- [`cddlib`](https://github.com/cddlib/cddlib): for convex polytope vertex/halfspace conversion
 
 Download the code:
 ```bash
@@ -114,7 +118,7 @@ pip install .
 ```
 If you want to install all Python dependencies to run the examples, specify those optional dependencies:
 ```bash
-pip install .[examples,heightmaps]
+pip install .[examples,heightmaps,polytopes]
 ```
 If you have installed the `examples` dependencies, test your installation by running:
 ```bash
@@ -160,6 +164,23 @@ See the `environment.yaml` file for a basic environment, and see `docker/ubuntu2
 We currently support x86 CPUs (e.g., Intel, AMD) with the [AVX2 vector instruction set](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions) and ARM CPUs (e.g., Raspberry Pi, Mac M1) with [NEON](https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)).
 Please see the `docker/` folder for reference installation procedures.
 
+### WebAssembly (WASM)
+
+VAMP can be compiled to WebAssembly for use in web browsers via [Emscripten](https://emscripten.org/). 
+The WASM build uses 128-bit SIMD instructions.
+
+#### Building WASM Modules
+
+First, install Emscripten.
+Then build the WASM modules:
+```bash
+cd vamp
+emcmake cmake -Bbuild-wasm -DCMAKE_BUILD_TYPE=Release -DVAMP_BUILD_WASM=ON -DVAMP_BUILD_PYTHON_BINDINGS=OFF
+cmake --build build-wasm
+```
+
+This produces `{robot}_wasm.js` and `{robot}_wasm.wasm` files in `build-wasm/wasm/` for each robot (by default: `panda`, `fetch`, `ur5`).
+
 ### Using Clang instead of GCC
 You can force the use of Clang instead of GCC for compiling VAMP by uncommenting the line at the bottom of the `pyproject.toml` (or setting the corresponding CMake variable for C++ builds):
 ```toml
@@ -170,6 +191,19 @@ VAMP_FORCE_CLANG = "ON"
 
 This may have performance implications for some systems (positive or negative).
 We recommend trying both compilers to see which works best for your particular setup.
+
+### Testing
+
+VAMP has automated tests that run with Catch2. To run the tests, do the following:
+
+```sh
+# set up cmake dir
+cmake -Bbuild -DVAMP_BUILD_TESTS=ON -DVAMP_BUILD_PYTHON_BINDINGS=OFF -DCMAKE_BUILD_TYPE=Debug
+# build test binary
+cmake --build build -j
+# test with catch2
+ctest --test-dir build --output-on-failure
+```
 
 ## Supported Robots
 We ship code to do planning for a sphere in $\mathbb{R}^3$ and the UR5, Panda, Fetch, and Baxter models as found in [`robowflex_resources`](https://github.com/KavrakiLab/robowflex_resources) [[5]](#5), as used in the MotionBenchMaker (MBM) [[3]](#3) dataset.
@@ -295,6 +329,12 @@ These objects can be created with the following:
 - `vamp.Cuboid(center, euler_xyz, half_extents)`: a cuboid specified by the frame and then half-extents (radii) along the X, Y, and Z axes in its local frame.
 - `vamp.Heightfield` via `vamp.make_heightfield` / `vamp.png_to_heightfield`: a heightfield specified by pixel intensity in an image file, scaled over specified dimensions.
 - Pointclouds via `add_pointcloud()` in `vamp.Environment`. This will construct a CAPT from the provided list of points, the minimum and maximum robot sphere radii, and radius for each point in the pointcloud.
+- `vamp.ConvexPolytope`: a convex polytope obstacle defined by halfspace planes and/or vertices. Can be constructed in several ways:
+  - `ConvexPolytope.from_vertices(vertices)`: from a numpy array of vertices
+  - `ConvexPolytope.from_planes(planes)`: from halfspace planes as `List[[nx, ny, nz, d]]` where the interior satisfies `nx*x + ny*y + nz*z <= d`
+  - `ConvexPolytope.from_both(vertices, planes)`: from both representations simultaneously
+  - `vamp.mesh_to_polytopes(filename, position, scale, convex_decomposition, name)`: helper function to load a mesh file and convert it to a list of `ConvexPolytope` obstacles. Supports convex hull or convex decomposition of non-convex meshes. Requires `trimesh`.
+
 See the `src/impl/vamp/collision/` folder for more information.
 
 Some robots (currently, the UR5, Panda, and Fetch) support attaching custom geometry (a collection of spheres) to the end-effector via `vamp.Attachment(relative_position, relative_quaternion_xyzw)`.
@@ -346,7 +386,7 @@ Inside `impl/vamp`, the code is divided into the following directories:
 - [ ] Batch configuration validation
 - [ ] Planning subgroups
 - [X] Object attachment at end-effector
-- [ ] Mesh collision checking
+- [X] Mesh collision checking
 - [X] Pointcloud collision checking
 - [ ] Manifold-constrained planning
 - [ ] Time-optimal trajectory parameterization

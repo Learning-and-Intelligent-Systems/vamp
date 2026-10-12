@@ -10,7 +10,7 @@ namespace vamp::robots
 {
 struct Sphere
 {
-    static constexpr char* name = "sphere";
+    static constexpr const char* name = "sphere";
     static constexpr std::size_t dimension = 3;
     static constexpr std::size_t n_spheres = 1;
     static constexpr float min_radius = 0.10000000149011612;
@@ -18,7 +18,7 @@ struct Sphere
     static constexpr std::size_t resolution = 32;
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"x", "y", "theta"};
-    static constexpr char* end_effector = "base";
+    static constexpr const char* end_effector = "base";
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;

@@ -1,4 +1,6 @@
 build/
+build-wasm/
+build_test/
 .cache/
 compile_commands.json
 *.out.*
@@ -20,3 +22,5 @@ venv/
 src/vamp/_core/*.pyi
 /.mypy_cache/
 **/.DS_Store
+.DS_store
+vamp-web/

@@ -1,4 +1,24 @@
-find_package(Eigen3 REQUIRED NO_MODULE)
+# Fetch Eigen header-only library for WASM builds
+# Emscripten doesn't have access to system packages
+# Some build environments may also not have Eigen
+if(NOT EMSCRIPTEN)
+  find_package(Eigen3 QUIET NO_MODULE)
+endif()
+
+if(NOT Eigen3_FOUND)
+  CPMAddPackage(
+    NAME Eigen3
+    VERSION 3.4.0
+    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+    DOWNLOAD_ONLY YES
+  )
+  if(Eigen3_ADDED)
+    add_library(Eigen3::Eigen INTERFACE IMPORTED)
+    set_target_properties(Eigen3::Eigen PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${Eigen3_SOURCE_DIR}>"
+    )
+  endif()
+endif()
 
 CPMAddPackage("gh:kavrakilab/nigh#97130999440647c204e0265d05a997dbd8da4e70")
 add_library(nigh INTERFACE)
@@ -30,8 +50,45 @@ if(VAMP_INSTALL_CPP_LIBRARY)
   export(EXPORT pdqsort_TARGETS FILE ${CMAKE_CURRENT_BINARY_DIR}/cmake/pdqsortTargets.cmake NAMESPACE pdqsort::)
 endif()
 
+# cddlib for convex polytope vertex/halfspace conversion
+CPMAddPackage(
+  NAME cddlib
+  GITHUB_REPOSITORY cddlib/cddlib
+  GIT_TAG 0.94m
+)
+
+if(cddlib_SOURCE_DIR)
+  # cddlib uses autotools...
+  add_library(cdd STATIC
+    ${cddlib_SOURCE_DIR}/lib-src/cddcore.c
+    ${cddlib_SOURCE_DIR}/lib-src/cddlp.c
+    ${cddlib_SOURCE_DIR}/lib-src/cddmp.c
+    ${cddlib_SOURCE_DIR}/lib-src/cddio.c
+    ${cddlib_SOURCE_DIR}/lib-src/cddlib.c
+    ${cddlib_SOURCE_DIR}/lib-src/cddproj.c
+    ${cddlib_SOURCE_DIR}/lib-src/setoper.c
+  )
+  target_include_directories(cdd PUBLIC
+    $<BUILD_INTERFACE:${cddlib_SOURCE_DIR}/lib-src>
+  )
+  set_target_properties(cdd PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  if(VAMP_INSTALL_CPP_LIBRARY)
+    install(TARGETS cdd
+          EXPORT cdd_TARGETS
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+          INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(EXPORT cdd_TARGETS FILE cddTargets.cmake NAMESPACE cdd:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cdd)
+    export(EXPORT cdd_TARGETS FILE ${CMAKE_CURRENT_BINARY_DIR}/cmake/cddTargets.cmake NAMESPACE cdd::)
+  endif()
+endif()
+
 # SIMDxorshift for x86_64 systems (includes macOS Intel and Linux x86_64)
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
+# Explicitly exclude Emscripten since it doesn't support AVX
+if(NOT EMSCRIPTEN AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64"))
   CPMAddPackage("gh:lemire/SIMDxorshift#857c1a01df53cf1ee1ae8db3238f0ef42ef8e490")
   
   if(SIMDxorshift_SOURCE_DIR)
@@ -55,4 +112,14 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "
     
     # SIMDxorshift target created successfully
   endif()
+endif()
+
+if(VAMP_BUILD_TESTS)
+  CPMAddPackage(
+    NAME Catch2
+    GITHUB_REPOSITORY catchorg/Catch2
+    VERSION 3.7.1
+    OPTIONS "CATCH_INSTALL_DOCS OFF" "CATCH_INSTALL_EXTRAS OFF"
+  )
+  list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
 endif()

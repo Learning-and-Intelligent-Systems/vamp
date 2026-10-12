@@ -152,6 +152,8 @@ namespace vamp::planning
         {
         }
 
+        virtual ~ProlateHyperspheroidRNG() = default;
+
         inline void reset() noexcept override
         {
             rng->reset();
@@ -164,7 +166,7 @@ namespace vamp::planning
 
             // Clamp values
             Robot::descale_configuration(x);
-            x.clamp(0.F, 1.F);
+            x = x.clamp(0.F, 1.F);
             Robot::scale_configuration(x);
 
             return x;

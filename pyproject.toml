@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "vamp-planner"
-version = "0.6.1"
+version = "0.6.4"
 description = "Vector-Accelerated Motion Planner"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -20,6 +20,7 @@ dependencies = ["numpy"]
 [project.optional-dependencies]
 examples = ["fire", "pybullet", "pyyaml", "tqdm", "pandas", "tabulate", "xmltodict"]
 heightmaps = ["pillow"]
+polytopes = ["trimesh", "vhacdx", "scipy"]
 
 [project.urls]
 Homepage = "https://github.com/KavrakiLab/vamp"

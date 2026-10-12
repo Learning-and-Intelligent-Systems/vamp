@@ -212,45 +212,50 @@ namespace vamp::collision
                 uint32_t lo_len = 0;
                 for (const auto idx : hi_afford)
                 {
-                    if (points[idx][frame.d] <= test + r_max)
+                    if (points[idx][frame.d] <= test + max_affordance_l1)
                     {
                         lo_afford[lo_len++] = idx;
                     }
 
-                    if (points[idx][frame.d] >= test - r_max)
+                    if (points[idx][frame.d] >= test - max_affordance_l1)
                     {
                         hi_afford[hi_len++] = idx;
                     }
                 }
 
-                uint32_t new_hi_afford = frame.points_begin;
-                uint32_t new_lo_afford = frame.points_begin + next_width;
-                while (new_hi_afford < frame.points_begin + next_width and
-                       points[argsort[new_hi_afford]][frame.d] >= test - r_max and
-                       std::isfinite(points[argsort[new_hi_afford]][frame.d]))
+                // Both halves of [points_begin, points_begin + how_many_points)
+                // are sorted ascending on dimension d, so the points adjacent to
+                // the split plane are the lo half's suffix and the hi half's
+                // prefix.
+
+                uint32_t new_hi_begin = frame.points_begin + next_width;
+                while (new_hi_begin > frame.points_begin and
+                       points[argsort[new_hi_begin - 1]][frame.d] >= test - max_affordance_l1 and
+                       std::isfinite(points[argsort[new_hi_begin - 1]][frame.d]))
                 {
-                    ++new_hi_afford;
+                    --new_hi_begin;
                 }
 
-                while (new_lo_afford < frame.points_begin + frame.how_many_points and
-                       points[argsort[new_lo_afford]][frame.d] <= test + r_max and
-                       std::isfinite(points[argsort[new_lo_afford]][frame.d]))
+                uint32_t new_lo_end = frame.points_begin + next_width;
+                while (new_lo_end < frame.points_begin + frame.how_many_points and
+                       points[argsort[new_lo_end]][frame.d] <= test + max_affordance_l1 and
+                       std::isfinite(points[argsort[new_lo_end]][frame.d]))
                 {
-                    ++new_lo_afford;
+                    ++new_lo_end;
                 }
 
-                uint32_t num_new_hi = new_hi_afford - frame.points_begin;
-                uint32_t num_new_lo = new_lo_afford - (frame.points_begin + next_width);
+                uint32_t num_new_hi = (frame.points_begin + next_width) - new_hi_begin;
+                uint32_t num_new_lo = new_lo_end - (frame.points_begin + next_width);
 
                 hi_afford.resize(hi_len + num_new_hi);
                 std::copy(
-                    argsort.begin() + frame.points_begin,
-                    argsort.begin() + new_hi_afford,
+                    argsort.begin() + new_hi_begin,
+                    argsort.begin() + frame.points_begin + next_width,
                     hi_afford.begin() + hi_len);
                 lo_afford.resize(lo_len + num_new_lo);
                 std::copy(
                     argsort.begin() + frame.points_begin + next_width,
-                    argsort.begin() + new_lo_afford,
+                    argsort.begin() + new_lo_end,
                     lo_afford.begin() + lo_len);
 
                 const uint8_t next_d = (frame.d + 1) % 3;
@@ -424,7 +429,7 @@ namespace vamp::collision
         // - `radii`: SIMD vector of the radii of each sphere.
         auto collides_simd(const std::array<FVectorT, 3> &centers, FVectorT radii) const noexcept -> bool
         {
-            // Padd radii by radius of points.
+            // Pad radii by radius of points.
             radii = radii + r_point;
             // Test against top AABB
             FVectorT inbounds =
@@ -441,20 +446,28 @@ namespace vamp::collision
                 return false;
             }
 
-            FVectorT these_tests = FVectorT::fill(tests[0]);
-            FVectorT cmp_results = centers[0].greater_equal(these_tests);
-            auto idxs = (cmp_results >> 31U).template as<IVectorT>() + 1;
-
-            // Search downward through the tree, parallel across each point
-            for (uint8_t i = 1, k = 1; i < nlog2; i++)
+            IVectorT zs;
+            if (nlog2 == 0)
             {
-                these_tests = FVectorT::gather(tests.data(), idxs);
-                cmp_results = centers[k].greater_equal(these_tests);
-                idxs = (idxs << 1U) + (cmp_results >> 31U).template as<IVectorT>() + 1;
-                k = (k + 1) % 3;
+                zs = IVectorT::fill(0);
             }
+            else
+            {
+                FVectorT these_tests = FVectorT::fill(tests[0]);
+                FVectorT cmp_results = centers[0].greater_equal(these_tests);
+                auto idxs = (cmp_results >> 31U).template as<IVectorT>() + 1;
 
-            const IVectorT zs = idxs - tests.size();
+                // Search downward through the tree, parallel across each point
+                for (uint8_t i = 1, k = 1; i < nlog2; i++)
+                {
+                    these_tests = FVectorT::gather(tests.data(), idxs);
+                    cmp_results = centers[k].greater_equal(these_tests);
+                    idxs = (idxs << 1U) + (cmp_results >> 31U).template as<IVectorT>() + 1;
+                    k = (k + 1) % 3;
+                }
+
+                zs = idxs - tests.size();
+            }
 
             IVectorT zs6 = zs * 6;
             const float *const aabb_ptr = &aabbs.front().lower.front();
