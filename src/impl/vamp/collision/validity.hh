@@ -281,6 +281,16 @@ namespace vamp
     inline constexpr auto attachment_environment_collision(const collision::Environment<DataT> &e) noexcept
         -> bool
     {
+        // Screen: nothing meets the bounding sphere, nothing meets the spheres. Not with a
+        // point cloud: CAPT answers only radii up to the r_max it was built for.
+        const auto &a = *e.attachments;
+        if (a.posed_spheres.size() > 1 and e.pointclouds.empty() and
+            not sphere_environment_in_collision(
+                e, a.posed_bound.x, a.posed_bound.y, a.posed_bound.z, a.posed_bound.r[{0, 0}]))
+        {
+            return false;
+        }
+
         for (const auto &s : e.attachments->posed_spheres)
         {
             // HACK: The radius needs to be a float, and unfortunately the spheres assume homogeneous
@@ -309,6 +319,14 @@ namespace vamp
         auto sy = static_cast<DataT>(sy_);
         auto sz = static_cast<DataT>(sz_);
         auto sr = static_cast<DataT>(sr_);
+        const auto &a = *e.attachments;
+        if (a.posed_spheres.size() > 1 and
+            collision::sphere_sphere_sql2(
+                sx, sy, sz, sr, a.posed_bound.x, a.posed_bound.y, a.posed_bound.z, a.posed_bound.r)
+                .test_zero())
+        {
+            return false;
+        }
         for (const auto &att_s : e.attachments->posed_spheres)
         {
             if (not collision::sphere_sphere_sql2(sx, sy, sz, sr, att_s.x, att_s.y, att_s.z, att_s.r)
