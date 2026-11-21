@@ -35,5 +35,8 @@ cmake.build-type = "Release"
 
 [tool.scikit-build.cmake.define]
 VAMP_LTO = "OFF"
-VAMP_ROBOT_MODULES="sphere;ur5;panda;fetch;baxter;droid;rainbow;rainbowl;rainbowcam;rainbowcaml;rbybase;rbyarm;spherebase;movo;fetchx;spot;pandax;pr2x"
-VAMP_ROBOT_STRUCTS="Sphere;UR5;Panda;Fetch;Baxter;Droid;Rainbow;Rainbowl;RainbowCam;RainbowCaml;Rbybase;Rbyarm;SphereBase;Movo;Fetchx;Spot;Pandax;Pr2x"
+# The robots compiled in: "default" (rainbow, rainbowl, spot: minutes) or "extended"
+# (those plus rainbowcam, rainbowcaml, droid, pandax, fetchx, pr2x, movo: most of an
+# hour). See cmake/Python.cmake. The branch robot-sets-extended is this commit with
+# "extended" here, for installs that pin a commit and cannot pass a build setting.
+VAMP_ROBOT_SET = "default"

@@ -14,23 +14,38 @@ if(VAMP_BUILD_PYTHON_BINDINGS)
     message(FATAL_ERROR "VAMP_BUILD_PYTHON_BINDINGS is ON but Python was not found")
   endif()
 
+  # Which robots are compiled into the extension. Each robot is one long
+  # translation unit (droid and pr2x alone are two thirds of the source), so
+  # the set decides the build time. VAMP_ROBOT_SET names one:
+  #   default    rainbow, rainbowl (the left hand's attachment frame), spot
+  #   extended   default + rainbowcam, rainbowcaml, droid, pandax, fetchx, pr2x, movo
+  #   upstream   upstream VAMP's own: sphere, ur5, panda, fetch, baxter
+  # An explicit VAMP_ROBOT_MODULES / VAMP_ROBOT_STRUCTS pair overrides it.
+  # A robot left out is absent from the Python module (vamp.robots lists what
+  # is there); HPN checks such a robot with its exact collision checker.
   if(NOT VAMP_ROBOT_MODULES)
-    list(APPEND VAMP_ROBOT_MODULES
-      sphere
-      ur5
-      panda
-      fetch
-      baxter
-    )
-
-    list(APPEND VAMP_ROBOT_STRUCTS
-      Sphere
-      UR5
-      Panda
-      Fetch
-      Baxter
-    )
+    if(NOT VAMP_ROBOT_SET)
+      set(VAMP_ROBOT_SET "default")
+    endif()
+    set(_vamp_default_modules rainbow rainbowl spot)
+    set(_vamp_default_structs Rainbow Rainbowl Spot)
+    if(VAMP_ROBOT_SET STREQUAL "default")
+      set(VAMP_ROBOT_MODULES ${_vamp_default_modules})
+      set(VAMP_ROBOT_STRUCTS ${_vamp_default_structs})
+    elseif(VAMP_ROBOT_SET STREQUAL "extended")
+      set(VAMP_ROBOT_MODULES ${_vamp_default_modules}
+        rainbowcam rainbowcaml droid pandax fetchx pr2x movo)
+      set(VAMP_ROBOT_STRUCTS ${_vamp_default_structs}
+        RainbowCam RainbowCaml Droid Pandax Fetchx Pr2x Movo)
+    elseif(VAMP_ROBOT_SET STREQUAL "upstream")
+      set(VAMP_ROBOT_MODULES sphere ur5 panda fetch baxter)
+      set(VAMP_ROBOT_STRUCTS Sphere UR5 Panda Fetch Baxter)
+    else()
+      message(FATAL_ERROR
+        "VAMP_ROBOT_SET is '${VAMP_ROBOT_SET}': expected default, extended or upstream")
+    endif()
   endif()
+  message(STATUS "VAMP robots: ${VAMP_ROBOT_MODULES}")
 
   foreach(robot ${VAMP_ROBOT_MODULES})
     string(APPEND VAMP_ROBOT_INITS "    vb::init_${robot}(pymodule);\n")
