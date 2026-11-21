@@ -39,4 +39,4 @@ VAMP_LTO = "OFF"
 # (those plus rainbowcam, rainbowcaml, droid, pandax, fetchx, pr2x, movo: most of an
 # hour). See cmake/Python.cmake. The branch robot-sets-extended is this commit with
 # "extended" here, for installs that pin a commit and cannot pass a build setting.
-VAMP_ROBOT_SET = "default"
+VAMP_ROBOT_SET = "extended"
